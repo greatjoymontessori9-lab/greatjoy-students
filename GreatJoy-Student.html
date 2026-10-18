@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student App</title>
+<style>
+:root{--ink:#16233D;--ink-2:#233052;--paper:#FAF6EC;--paper-2:#F1EAD9;--line:#D8CFB8;--green:#2F6B4F;--green-bg:#E4EFE7;--red:#A83232;--red-bg:#F6E4E1;--gold:#B08D2B;--text:#2A2620;--dim:#6B6255;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--serif:Georgia,"Times New Roman",serif;}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);color:var(--text);background:var(--paper);min-height:100vh;}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:16px;width:100%;padding:11px 12px;border:1px solid var(--line);background:#fff;color:var(--text);border-radius:0}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px;color:var(--ink)}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px 40px}
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,#16233D,#233052)}
+.card{background:var(--paper);border:1px solid var(--line);padding:26px 22px;width:100%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.center{text-align:center}
+.logo{width:84px;height:84px;object-fit:contain;display:block;margin:0 auto 8px}
+h1{font-family:var(--serif);color:var(--ink);margin:0 0 4px;font-size:24px}
+.sub{color:var(--dim);font-size:14px;margin:0 0 6px}
+.btn{display:block;width:100%;margin-top:20px;padding:13px;background:var(--ink);color:#fff;border:0;font-size:16px;font-weight:600}
+.btn:disabled{opacity:.6}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);margin-top:10px}
+.err{background:var(--red-bg);color:var(--red);padding:10px 12px;margin-top:14px;font-size:14px;display:none}
+.ok{background:var(--green-bg);color:var(--green);padding:10px 12px;margin:12px 0;font-size:14px}
+.top{background:var(--ink);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+.top img{width:40px;height:40px;object-fit:cover;border-radius:50%;background:#fff}
+.top .nm{font-weight:700;line-height:1.2}.top .cl{font-size:12px;opacity:.8}
+.top button{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:6px 10px;font-size:13px}
+.tabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:66px;z-index:4}
+.tabs button{flex:1;padding:13px 4px;border:0;background:transparent;font-size:14px;font-weight:600;color:var(--dim);border-bottom:3px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--gold)}
+.pill{display:inline-block;padding:3px 9px;font-size:12px;font-weight:700;border-radius:99px}
+.p-pending{background:#FFF3CD;color:#7a5b00}.p-approved{background:var(--green-bg);color:var(--green)}.p-rejected{background:var(--red-bg);color:var(--red)}
+.box{background:#fff;border:1px solid var(--line);padding:16px;margin-top:16px}
+.box h2{font-family:var(--serif);font-size:18px;margin:0 0 4px;color:var(--ink)}
+.soon{color:var(--dim);font-size:14px}
+.photo{width:110px;height:110px;object-fit:cover;border:2px solid var(--gold);display:block;margin:8px 0;background:var(--paper-2)}
+.prev{background:var(--gold);color:#fff;text-align:center;font-size:13px;padding:6px;font-weight:600}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="boot" class="gate"><div class="card center"><p class="sub">Loading…</p></div></div>
+
+<div id="gate" class="gate hide">
+  <div class="card">
+    <div class="center">
+      <img id="g-logo" class="logo hide" alt="">
+      <h1 id="g-school">Student App</h1>
+      <p class="sub" id="g-motto"></p>
+      <p class="sub" style="margin-top:10px">Sign in with your name, class and PIN from the school.</p>
+    </div>
+    <label for="g-name">Full name</label>
+    <input id="g-name" autocomplete="off" placeholder="As on your school record">
+    <label for="g-class">Class</label>
+    <select id="g-class"></select>
+    <label for="g-pin">PIN</label>
+    <input id="g-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="5-digit PIN" onkeydown="if(event.key==='Enter')login()">
+    <div id="g-err" class="err"></div>
+    <button class="btn" id="g-btn" onclick="login()">Sign in</button>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <div id="prev" class="prev hide">PREVIEW — this is what the student sees. Changes cannot be sent from here.</div>
+  <div class="top">
+    <img id="t-photo" alt="">
+    <div><div class="nm" id="t-name"></div><div class="cl" id="t-class"></div></div>
+    <button onclick="logout()">Sign out</button>
+  </div>
+  <div class="tabs">
+    <button class="on" data-t="home" onclick="tab('home')">Home</button>
+    <button data-t="details" onclick="tab('details')">My details</button>
+    <button data-t="work" onclick="tab('work')">Work</button>
+    <button data-t="report" onclick="tab('report')">Report</button>
+  </div>
+  <div class="wrap">
+    <div id="tab-home">
+      <div class="box"><h2 id="h-hello">Welcome</h2><p class="soon" id="h-school"></p><div id="h-status"></div></div>
+      <div class="box"><h2>Homework &amp; tests</h2><p class="soon">Coming soon. Your teachers will post work here.</p></div>
+      <div class="box"><h2>Report</h2><p class="soon">Your end-of-term report will appear here once the school publishes it.</p></div>
+    </div>
+    <div id="tab-details" class="hide">
+      <div class="box">
+        <h2>My details</h2>
+        <p class="soon">A parent or guardian can help fill this in. The school checks everything before it is saved.</p>
+        <label>Photo</label>
+        <img id="d-photo" class="photo" alt="">
+        <input type="file" id="d-file" accept="image/*" onchange="pickPhoto(this)">
+        <label for="f-dob">Date of birth</label><input type="date" id="f-dob">
+        <label for="f-gender">Gender</label><select id="f-gender"><option value="">—</option><option>Male</option><option>Female</option></select>
+        <label for="f-guardianName">Parent / guardian name</label><input id="f-guardianName">
+        <label for="f-guardianRelationship">Relationship to child</label><input id="f-guardianRelationship" placeholder="e.g. Mother, Father, Uncle">
+        <label for="f-guardianPhone">Parent / guardian phone</label><input id="f-guardianPhone" inputmode="tel">
+        <label for="f-guardianEmail">Parent / guardian email (optional)</label><input id="f-guardianEmail" type="email">
+        <label for="f-address">Home address</label><input id="f-address">
+        <label for="f-emergencyName">Emergency contact name</label><input id="f-emergencyName">
+        <label for="f-emergencyPhone">Emergency contact phone</label><input id="f-emergencyPhone" inputmode="tel">
+        <label for="f-medical">Medical needs / allergies (optional)</label><textarea id="f-medical" rows="3"></textarea>
+        <div id="d-msg"></div>
+        <div id="d-err" class="err"></div>
+        <button class="btn" id="d-btn" onclick="submitDetails()">Send to school</button>
+      </div>
+    </div>
+    <div id="tab-work" class="hide"><div class="box"><h2>Homework &amp; tests</h2><p class="soon">Coming soon. Your teachers will post homework and class tests here, and you will answer them in this app.</p></div></div>
+    <div id="tab-report" class="hide"><div class="box"><h2>Report</h2><p class="soon">Your report will appear here at the end of term, once the school publishes it.</p></div></div>
+  </div>
+</div>
+
+<script>
+const STUDENT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwP74HSMUgEfeWCwzqdYWPW5LXXJWEHG77s_E1fLUQnZpkMuZNKSE7sNKBsLYiic_wO/exec';   // same school script as the main app; no school PIN is stored here
+const FIELDS = ['dob','gender','guardianName','guardianRelationship','guardianPhone','guardianEmail','address','emergencyName','emergencyPhone','medical'];
+let token = '', preview = false, newPhoto = '', prof = null;
+const $ = id => document.getElementById(id);
+
+async function call(body){
+  const res = await fetch(STUDENT_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(body)});
+  if (!res.ok) throw new Error('No connection. Please check your internet and try again.');
+  const d = await res.json();
+  if (d && d.error){ const e = new Error(d.error); e.expired = !!d.expired; throw e; }
+  return d;
+}
+function show(id){ ['boot','gate','app'].forEach(x => $(x).classList.toggle('hide', x !== id)); }
+function showErr(el, msg){ el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
+
+async function init(){
+  const m = /[#&]t=([^&]+)/.exec(location.hash);
+  if (m){ token = decodeURIComponent(m[1]); preview = true; history.replaceState(null,'',location.pathname+location.search); }
+  else { try{ token = sessionStorage.getItem('gj_stu_token') || ''; }catch(e){} }
+  try{
+    const info = await call({action:'stuPublic'});
+    document.title = (info.schoolName || 'School') + ' — Student App';
+    $('g-school').textContent = info.schoolName || 'Student App';
+    $('g-motto').textContent = info.motto || '';
+    if (info.logo){ $('g-logo').src = info.logo; $('g-logo').classList.remove('hide'); }
+    $('g-class').innerHTML = (info.classes||[]).map(c=>'<option>'+esc(c)+'</option>').join('');
+  }catch(e){ show('gate'); showErr($('g-err'), e.message); return; }
+  if (token){ try{ await loadProfile(); return; }catch(e){ token = ''; } }
+  show('gate');
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function login(){
+  showErr($('g-err'),'');
+  const name = $('g-name').value.trim(), cls = $('g-class').value, pin = $('g-pin').value.trim();
+  if (!name || !pin){ showErr($('g-err'),'Please type your name and PIN.'); return; }
+  $('g-btn').disabled = true; $('g-btn').textContent = 'Signing in…';
+  try{
+    const r = await call({action:'stuLogin', name, cls, pin});
+    token = r.token; try{ sessionStorage.setItem('gj_stu_token', token); }catch(e){}
+    $('g-pin').value = '';
+    await loadProfile();
+  }catch(e){ showErr($('g-err'), e.message); }
+  $('g-btn').disabled = false; $('g-btn').textContent = 'Sign in';
+}
+function logout(){ token=''; try{ sessionStorage.removeItem('gj_stu_token'); }catch(e){} if (preview){ window.close(); } show('gate'); }
+
+async function loadProfile(){
+  const keepPhoto = newPhoto;
+  const r = await call({action:'stuProfile', token});
+  prof = r;
+  $('prev').classList.toggle('hide', !preview);
+  $('t-name').textContent = r.student.name; $('t-class').textContent = r.student.class;
+  const ph = r.student.photo || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23F1EAD9"/><circle cx="40" cy="32" r="14" fill="%23D8CFB8"/><rect x="16" y="52" width="48" height="30" rx="14" fill="%23D8CFB8"/></svg>';
+  $('t-photo').src = ph; $('d-photo').src = ph;
+  $('h-hello').textContent = 'Hello, ' + r.student.name.split(' ')[0];
+  $('h-school').textContent = r.school.name || '';
+  FIELDS.forEach(k => { $('f-'+k).value = r.student.fields[k] || ''; });
+  newPhoto = '';
+  renderStatus(r.update);
+  if (preview){ $('d-btn').disabled = true; $('d-btn').textContent = 'Preview only'; }
+  show('app'); tab('home');
+}
+function renderStatus(u){
+  const map = {pending:['p-pending','Waiting for the school to check'], approved:['p-approved','Approved by the school'], rejected:['p-rejected','Not accepted — please check and send again']};
+  const h = u ? '<p class="soon">Your last update: <span class="pill '+map[u.status][0]+'">'+map[u.status][1]+'</span></p>' : '<p class="soon">Please open <b>My details</b> and check that your information is complete.</p>';
+  $('h-status').innerHTML = h; $('d-msg').innerHTML = u ? h : '';
+}
+function tab(t){
+  ['home','details','work','report'].forEach(x => { $('tab-'+x).classList.toggle('hide', x!==t); });
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.t===t));
+  window.scrollTo(0,0);
+}
+function pickPhoto(inp){
+  const f = inp.files && inp.files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => {
+    const max = 480, sc = Math.min(1, max/Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    newPhoto = c.toDataURL('image/jpeg', .8); $('d-photo').src = newPhoto; URL.revokeObjectURL(url);
+  };
+  img.onerror = () => { showErr($('d-err'),'That picture could not be read. Please try another.'); };
+  img.src = url;
+}
+async function submitDetails(){
+  showErr($('d-err'),'');
+  if (preview) return;
+  const fields = {}; FIELDS.forEach(k => fields[k] = $('f-'+k).value.trim());
+  $('d-btn').disabled = true; $('d-btn').textContent = 'Sending…';
+  try{
+    const r = await call({action:'stuSubmit', token, fields, photo:newPhoto});
+    if (r.nothing){ $('d-msg').innerHTML = '<div class="ok">Nothing has changed since the school last saved your details.</div>'; }
+    else { await loadProfile(); FIELDS.forEach(k => { $('f-'+k).value = fields[k]; }); if (newPhoto) $('d-photo').src = newPhoto; tab('details'); $('d-msg').innerHTML += '<div class="ok">Sent. The school will check it and save it.</div>'; }
+  }catch(e){ if (e.expired){ logout(); } showErr($('d-err'), e.message); }
+  $('d-btn').disabled = false; $('d-btn').textContent = 'Send to school';
+}
+init();
+</script>
+</body>
+</html>
