@@ -38,6 +38,8 @@ h1{font-family:var(--serif);color:var(--ink);margin:0 0 4px;font-size:24px}
 .photo{width:110px;height:110px;object-fit:cover;border:2px solid var(--gold);display:block;margin:8px 0;background:var(--paper-2)}
 .prev{background:var(--gold);color:#fff;text-align:center;font-size:13px;padding:6px;font-weight:600}
 .hide{display:none!important}
+.gj-code{background:#1e2430;color:#e8ecf3;padding:8px 10px;margin:6px 0;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow-x:auto;white-space:pre}
+.gjm{display:inline-block;max-width:100%;overflow-x:auto;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -78,7 +80,7 @@ h1{font-family:var(--serif);color:var(--ink);margin:0 0 4px;font-size:24px}
   <div class="wrap">
     <div id="tab-home">
       <div class="box"><h2 id="h-hello">Welcome</h2><p class="soon" id="h-school"></p><div id="h-status"></div></div>
-      <div class="box"><h2>Homework &amp; tests</h2><p class="soon">Coming soon. Your teachers will post work here.</p></div>
+      <div class="box"><h2>Homework &amp; tests</h2><div id="h-work"><p class="soon">Open the <b>Work</b> tab to see your homework and tests.</p></div></div>
       <div class="box"><h2>Report</h2><p class="soon">Your end-of-term report will appear here once the school publishes it.</p></div>
     </div>
     <div id="tab-details" class="hide">
@@ -103,7 +105,7 @@ h1{font-family:var(--serif);color:var(--ink);margin:0 0 4px;font-size:24px}
         <button class="btn" id="d-btn" onclick="submitDetails()">Send to school</button>
       </div>
     </div>
-    <div id="tab-work" class="hide"><div class="box"><h2>Homework &amp; tests</h2><p class="soon">Coming soon. Your teachers will post homework and class tests here, and you will answer them in this app.</p></div></div>
+    <div id="tab-work" class="hide"><div class="box"><h2>Homework &amp; tests</h2><p class="soon">Loading…</p></div></div>
     <div id="tab-report" class="hide"><div class="box"><h2>Report</h2><p class="soon">Your report will appear here at the end of term, once the school publishes it.</p></div></div>
   </div>
 </div>
@@ -171,6 +173,7 @@ async function loadProfile(){
   renderStatus(r.update);
   if (preview){ $('d-btn').disabled = true; $('d-btn').textContent = 'Preview only'; }
   show('app'); tab('home');
+  call({action:'asmStuList', token}).then(x => { WORK = x.list; renderWork(); }).catch(()=>{});
 }
 function renderStatus(u){
   const map = {pending:['p-pending','Waiting for the school to check'], approved:['p-approved','Approved by the school'], rejected:['p-rejected','Not accepted — please check and send again']};
@@ -181,6 +184,7 @@ function tab(t){
   ['home','details','work','report'].forEach(x => { $('tab-'+x).classList.toggle('hide', x!==t); });
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.t===t));
   window.scrollTo(0,0);
+  if (t==='work' && !CUR) loadWork();
 }
 function pickPhoto(inp){
   const f = inp.files && inp.files[0]; if (!f) return;
@@ -206,6 +210,130 @@ async function submitDetails(){
   }catch(e){ if (e.expired){ logout(); } showErr($('d-err'), e.message); }
   $('d-btn').disabled = false; $('d-btn').textContent = 'Send to school';
 }
+/* ---------- GJ-MATH: formulas typed as $...$ (LaTeX) and code as ```...```, shown typeset ---------- */
+const GJM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/';
+let _gjmState = 0, _gjmWait = [];
+function gjmLoad(cb){
+  if (window.katex){ cb && cb(); return; }
+  if (cb) _gjmWait.push(cb);
+  if (_gjmState) return;
+  _gjmState = 1;
+  const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = GJM_CDN + 'katex.min.css'; document.head.appendChild(l);
+  const s = document.createElement('script'); s.src = GJM_CDN + 'katex.min.js';
+  s.onload = () => { _gjmState = 2; const w = _gjmWait; _gjmWait = []; w.forEach(f => { try{ f(); }catch(e){} }); };
+  s.onerror = () => { _gjmState = 0; };
+  document.head.appendChild(s);
+}
+function gjEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function gjRich(text){
+  return String(text == null ? '' : text).split(/(```[\s\S]*?```|\$[^$\n]+\$)/).map(p => {
+    if (/^```[\s\S]*```$/.test(p)) return '<pre class="gj-code">' + gjEsc(p.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '')) + '</pre>';
+    if (/^\$[^$\n]+\$$/.test(p)) return '<span class="gjm" data-tex="' + gjEsc(p.slice(1, -1)) + '">' + gjEsc(p) + '</span>';
+    return gjEsc(p).replace(/\n/g, '<br>');
+  }).join('');
+}
+function gjTypeset(root){
+  const els = (root || document).querySelectorAll('.gjm:not([data-done])');
+  if (!els.length) return;
+  gjmLoad(() => { els.forEach(el => { try{ window.katex.render(el.getAttribute('data-tex'), el, {throwOnError:false}); el.setAttribute('data-done', '1'); }catch(e){} }); });
+}
+
+/* ================================================================ Work tab: homework, classwork, class tests */
+const KIND_LABEL = {classwork:'Class Work', homework:'Home Work', test1:'Class Test 1', test2:'Class Test 2'};
+let WORK = null, CUR = null, timerId = null, skew = 0;
+function fmtDT(iso){ if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}); }
+async function loadWork(){
+  const box = $('tab-work');
+  if (!CUR) box.innerHTML = '<div class="box"><h2>Homework &amp; tests</h2><p class="soon">Loading…</p></div>';
+  try{
+    const r = await call({action:'asmStuList', token});
+    WORK = r.list; skew = r.now ? new Date(r.now).getTime() - Date.now() : 0;
+  }catch(e){ if (e.expired){ logout(); return; } box.innerHTML = '<div class="box"><h2>Homework &amp; tests</h2><div class="err" style="display:block">' + esc(e.message) + '</div></div>'; return; }
+  renderWork();
+}
+function workCard(w){
+  const k = KIND_LABEL[w.kind] || 'Work';
+  let right = '', btn = '';
+  if (w.done){
+    right = w.released ? (w.score == null ? '<span class="pill p-pending">Waiting for marking</span>' : '<span class="pill p-approved">' + w.score + ' / ' + w.totalMarks + '</span>') : '<span class="pill p-pending">Handed in</span>';
+    if (w.released) btn = '<button class="btn ghost" style="margin-top:8px" onclick="viewResult(\'' + w.id + '\')">See my result</button>';
+  } else if (w.state === 'open'){
+    right = '<span class="pill p-approved">Open</span>';
+    btn = '<button class="btn" style="margin-top:8px" onclick="startWork(\'' + w.id + '\')">' + (w.started ? 'Continue' : 'Start') + '</button>';
+  } else if (w.state === 'upcoming'){ right = '<span class="pill p-pending">Opens ' + esc(fmtDT(w.opensAt)) + '</span>'; }
+  else right = '<span class="pill p-rejected">Closed</span>';
+  return '<div style="border-top:1px solid var(--line);padding:12px 0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><div><strong>' + esc(w.title) + '</strong><div class="soon">' + esc(k) + ' · ' + esc(w.subject) + ' · ' + w.totalMarks + ' marks' + (w.minutes ? ' · ' + w.minutes + ' min' : '') + '</div>'
+    + (w.closesAt && !w.done ? '<div class="soon">Closes ' + esc(fmtDT(w.closesAt)) + '</div>' : '') + (w.done && w.late ? '<div class="soon">Handed in late</div>' : '') + '</div><div>' + right + '</div></div>' + btn + '</div>';
+}
+function renderWork(){
+  if (CUR) return;
+  const open = WORK.filter(w => !w.done && w.state === 'open'), up = WORK.filter(w => !w.done && w.state === 'upcoming'), done = WORK.filter(w => w.done), missed = WORK.filter(w => !w.done && w.state === 'closed');
+  const sec = (t, a) => a.length ? '<div class="box"><h2>' + t + '</h2>' + a.map(workCard).join('') + '</div>' : '';
+  $('tab-work').innerHTML = (open.length || up.length || done.length || missed.length) ? sec('To do now', open) + sec('Coming up', up) + sec('Handed in', done) + sec('Missed', missed) : '<div class="box"><h2>Homework &amp; tests</h2><p class="soon">Nothing yet. When a teacher posts homework or a test for your class it will show here.</p></div>';
+  const n = open.length; const h = $('h-work'); if (h) h.innerHTML = n ? '<p class="soon"><b>' + n + '</b> item(s) to do — open the <b>Work</b> tab.</p>' : '<p class="soon">Nothing to do right now.</p>';
+}
+function unitsOf(qs){ const u = []; qs.forEach(q => { if (q.type === 'structured') (q.parts || []).forEach(p => u.push({ id:p.id, type:p.kind === 'theory' ? 'theory' : 'short' })); else u.push({ id:q.id, type:q.type }); }); return u; }
+function draftKey(id){ return 'gj_ans_' + id; }
+function saveDraft(){ if (!CUR) return; const a = {}; unitsOf(CUR.questions).forEach(q => { const v = readAns(q); if (v !== '') a[q.id] = v; }); try{ localStorage.setItem(draftKey(CUR.id), JSON.stringify(a)); }catch(e){} }
+function readAns(q){
+  if (q.type === 'mcq'){ const r = document.querySelector('input[name="q-' + q.id + '"]:checked'); return r ? r.value : ''; }
+  const el = $('a-' + q.id); return el ? el.value.trim() : '';
+}
+async function startWork(id){
+  if (preview){ alert('This is a preview. Pupils start work from their own sign-in.'); return; }
+  try{
+    const r = await call({action:'asmStuStart', token, id});
+    CUR = r; skew = new Date(r.now).getTime() - Date.now();
+    let draft = {}; try{ draft = JSON.parse(localStorage.getItem(draftKey(id)) || '{}'); }catch(e){}
+    $('tab-work').innerHTML = '<div class="box"><div id="w-time" class="pill p-pending hide" style="position:sticky;top:112px;float:right;z-index:3"></div><h2>' + esc(r.title) + '</h2><p class="soon">' + esc(KIND_LABEL[r.kind] || '') + ' · ' + esc(r.subject) + ' · ' + r.totalMarks + ' marks</p>'
+      + (r.instructions ? '<div class="ok" style="background:#FFF3CD;color:#5c4400">' + esc(r.instructions) + '</div>' : '')
+      + r.questions.map((q, i) => '<div style="border-top:1px solid var(--line);padding:14px 0;"><div><strong>' + (i + 1) + '.</strong> <span class="soon">[' + q.marks + ' mark' + (q.marks == 1 ? '' : 's') + ']</span></div><div style="margin:6px 0;line-height:1.55">' + gjRich(q.text) + '</div>'
+        + (q.image ? '<img src="' + q.image + '" style="max-width:100%;border:1px solid var(--line);margin:6px 0;display:block">' : '') + (q.type === 'structured' ? q.parts.map(p => '<div style="margin:12px 0 0 6px;padding-left:10px;border-left:3px solid var(--gold);"><div><b>' + esc(p.label) + '</b> <span class="soon">[' + p.marks + ' mark' + (p.marks == 1 ? '' : 's') + ']</span></div><div style="margin:4px 0;line-height:1.55">' + gjRich(p.text) + '</div>' + qInput({id:p.id, type:p.kind === 'theory' ? 'theory' : 'short'}, draft[p.id]) + '</div>').join('') : qInput(q, draft[q.id])) + '</div>').join('')
+      + '<div id="w-err" class="err"></div><button class="btn" id="w-btn" onclick="submitWork(false)">Hand in</button><button class="btn ghost" onclick="leaveWork()">Back (keeps what I typed)</button></div>';
+    gjTypeset($('tab-work')); window.scrollTo(0, 0); tickTimer();
+    clearInterval(timerId); timerId = setInterval(tickTimer, 1000);
+  }catch(e){ if (e.expired){ logout(); return; } alert(e.message); loadWork(); }
+}
+function qInput(q, v){
+  v = v == null ? '' : v;
+  if (q.type === 'mcq') return q.options.map((o, j) => '<label style="display:flex;gap:10px;align-items:flex-start;margin:8px 0;font-weight:400;font-size:15px;"><input type="radio" name="q-' + q.id + '" value="' + j + '" ' + (String(v) === String(j) ? 'checked' : '') + ' onchange="saveDraft()" style="width:auto;margin-top:3px;"><span><b>' + 'ABCDEFGH'[j] + '.</b> ' + gjRich(o) + '</span></label>').join('');
+  if (q.type === 'short') return '<input id="a-' + q.id + '" value="' + esc(v) + '" oninput="saveDraft()" placeholder="Your answer" autocomplete="off">';
+  return '<textarea id="a-' + q.id + '" rows="6" oninput="saveDraft()" placeholder="Write your answer here">' + esc(v) + '</textarea>';
+}
+function leaveWork(){ saveDraft(); clearInterval(timerId); CUR = null; loadWork(); }
+function tickTimer(){
+  if (!CUR || !CUR.deadline) return;
+  const left = new Date(CUR.deadline).getTime() - (Date.now() + skew), el = $('w-time');
+  if (!el) return; el.classList.remove('hide');
+  if (left <= 0){ el.textContent = 'Time is up'; clearInterval(timerId); submitWork(true); return; }
+  const m = Math.floor(left / 60000), s = Math.floor(left % 60000 / 1000);
+  el.textContent = (m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ':' + String(s).padStart(2, '0')) + ' left';
+}
+async function submitWork(auto){
+  if (!CUR) return;
+  if (!auto && !confirm('Hand in now? You cannot change your answers after this.')) return;
+  const answers = {}; unitsOf(CUR.questions).forEach(q => { answers[q.id] = readAns(q); });
+  $('w-btn') && ($('w-btn').disabled = true);
+  try{
+    const r = await call({action:'asmStuSubmit', token, id:CUR.id, answers});
+    try{ localStorage.removeItem(draftKey(CUR.id)); }catch(e){}
+    clearInterval(timerId); const late = r.late; CUR = null;
+    $('tab-work').innerHTML = '<div class="box"><h2>Handed in</h2><div class="ok">Your answers have been sent to your teacher.' + (late ? ' (They arrived after the time limit and your teacher can see that.)' : '') + '</div><button class="btn" onclick="loadWork()">Back to my work</button></div>';
+  }catch(e){ if (e.expired){ logout(); return; } $('w-btn') && ($('w-btn').disabled = false); showErr($('w-err'), e.message); }
+}
+function viewResult(id){
+  const w = WORK.find(x => x.id === id); if (!w) return;
+  let h = '<div class="box"><h2>' + esc(w.title) + '</h2><p class="soon">' + esc(w.subject) + '</p><div class="ok">' + (w.score == null ? 'Your teacher is still marking some questions.' : 'Your score: <b>' + w.score + ' / ' + w.totalMarks + '</b>') + '</div>' + (w.comment ? '<p><b>Teacher:</b> ' + esc(w.comment) + '</p>' : '');
+  if (w.review) h += w.review.map((q, i) => {
+    const yours = q.yours === '' || q.yours == null ? '<i>No answer</i>' : q.type === 'mcq' ? 'ABCDEFGH'[+q.yours] + '. ' + gjRich((q.options || [])[+q.yours] || '') : esc(q.yours);
+    const right = q.type === 'mcq' ? 'ABCDEFGH'[q.correct] + '. ' + gjRich(q.options[q.correct]) : q.type === 'short' ? esc((q.answers || []).join(' or ')) : gjRich(q.guide || '');
+    if (q.type === 'structured') return '<div style="border-top:1px solid var(--line);padding:12px 0;"><b>' + (i + 1) + '.</b> <div style="margin:4px 0">' + gjRich(q.text) + '</div>' + (q.image ? '<img src="' + q.image + '" style="max-width:100%;border:1px solid var(--line)">' : '') + q.parts.map(p => '<div style="margin:8px 0 0 6px;padding-left:10px;border-left:3px solid var(--gold);"><b>' + esc(p.label) + '</b> <span class="soon">' + (p.got == null ? 'not marked' : p.got + ' / ' + p.marks) + '</span><div>' + gjRich(p.text) + '</div><div>Your answer: ' + (p.yours === '' || p.yours == null ? '<i>No answer</i>' : esc(p.yours)) + '</div>' + (p.kind === 'theory' ? (p.guide ? '<div style="color:var(--green)">Marking guide: ' + gjRich(p.guide) + '</div>' : '') : ((p.answers || []).length ? '<div style="color:var(--green)">Correct answer: ' + esc(p.answers.join(' or ')) + '</div>' : '')) + '</div>').join('') + '</div>';
+    return '<div style="border-top:1px solid var(--line);padding:12px 0;"><b>' + (i + 1) + '.</b> <span class="soon">' + (q.got == null ? 'not marked' : q.got + ' / ' + q.marks) + '</span><div style="margin:4px 0">' + gjRich(q.text) + '</div>' + (q.image ? '<img src="' + q.image + '" style="max-width:100%;border:1px solid var(--line)">' : '') + '<div>Your answer: ' + yours + '</div>' + (right ? '<div style="color:var(--green)">' + (q.type === 'theory' ? 'Marking guide: ' : 'Correct answer: ') + right + '</div>' : '') + '</div>';
+  }).join('');
+  h += '<button class="btn ghost" onclick="loadWork()">Back</button></div>';
+  $('tab-work').innerHTML = h; gjTypeset($('tab-work')); window.scrollTo(0, 0);
+}
+
 init();
 </script>
 </body>
