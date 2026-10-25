@@ -51,16 +51,20 @@ h1{font-family:var(--serif);color:var(--ink);margin:0 0 4px;font-size:24px}
       <img id="g-logo" class="logo hide" alt="">
       <h1 id="g-school">Student App</h1>
       <p class="sub" id="g-motto"></p>
-      <p class="sub" style="margin-top:10px">Sign in with your name, class and PIN from the school.</p>
+      <p class="sub" style="margin-top:10px">Type your name and choose your class. The school will check it, then ask for your PIN.</p>
     </div>
     <label for="g-name">Full name</label>
-    <input id="g-name" autocomplete="off" placeholder="As on your school record">
+    <input id="g-name" autocomplete="off" placeholder="Your names, in any order" oninput="gateReset()" onkeydown="if(event.key==='Enter')gateBtn()">
     <label for="g-class">Class</label>
-    <select id="g-class"></select>
-    <label for="g-pin">PIN</label>
-    <input id="g-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="5-digit PIN" onkeydown="if(event.key==='Enter')login()">
+    <select id="g-class" onchange="gateReset()"></select>
+    <div id="g-step2" class="hide">
+      <div class="ok" id="g-hello" style="margin:14px 0 0"></div>
+      <label for="g-pin">PIN</label>
+      <input id="g-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="5-digit PIN" onkeydown="if(event.key==='Enter')gateBtn()">
+    </div>
     <div id="g-err" class="err"></div>
-    <button class="btn" id="g-btn" onclick="login()">Sign in</button>
+    <button class="btn" id="g-btn" onclick="gateBtn()">Continue</button>
+    <button class="btn ghost hide" id="g-back" onclick="gateReset(true)">Not me / change name</button>
   </div>
 </div>
 
@@ -286,6 +290,7 @@ async function init(){
     const info = await call({action:'stuPublic'});
     document.title = (info.schoolName || 'School') + ' — Student App';
     stuApplySchoolTheme(info.theme);
+    try{ const v = document.getElementById('stu-ver'); if (v) v.textContent = 'Student app v2026.10.25-d · ' + (info.theme ? 'server OK, theme: ' + info.theme : 'server is OLD: redeploy Code.gs'); }catch(e){}
     $('g-school').textContent = info.schoolName || 'Student App';
     $('g-motto').textContent = info.motto || '';
     if (info.logo){ $('g-logo').src = info.logo; $('g-logo').classList.remove('hide'); }
@@ -296,18 +301,40 @@ async function init(){
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+let gateStep = 1;
+function gateReset(focus){
+  gateStep = 1; $('g-step2').classList.add('hide'); $('g-back').classList.add('hide'); $('g-btn').textContent = 'Continue'; $('g-pin').value = ''; showErr($('g-err'), '');
+  if (focus) $('g-name').focus();
+}
+function gateBtn(){ if (gateStep === 1) checkName(); else login(); }
+async function checkName(){
+  showErr($('g-err'), '');
+  const name = $('g-name').value.trim(), cls = $('g-class').value;
+  if (name.replace(/[^A-Za-z0-9]/g, '').length < 3){ showErr($('g-err'), 'Please type your name.'); return; }
+  $('g-btn').disabled = true; $('g-btn').textContent = 'Checking…';
+  try{
+    const r = await call({action:'stuCheck', name, cls});
+    if (!r.found){ showErr($('g-err'), 'We could not find that name in ' + cls + '. Check the spelling and the class, or ask the school.'); $('g-btn').textContent = 'Continue'; }
+    else if (r.many){ showErr($('g-err'), 'More than one pupil in ' + cls + ' matches. Please type your full name.'); $('g-btn').textContent = 'Continue'; }
+    else if (r.noPin){ showErr($('g-err'), 'Your PIN has not been given to you yet. Please ask the school.'); $('g-btn').textContent = 'Continue'; }
+    else {
+      gateStep = 2; $('g-hello').textContent = 'Found you: ' + r.name; $('g-step2').classList.remove('hide'); $('g-back').classList.remove('hide'); $('g-btn').textContent = 'Sign in'; $('g-pin').focus();
+    }
+  }catch(e){ showErr($('g-err'), e.message); $('g-btn').textContent = 'Continue'; }
+  $('g-btn').disabled = false;
+}
 async function login(){
   showErr($('g-err'),'');
   const name = $('g-name').value.trim(), cls = $('g-class').value, pin = $('g-pin').value.trim();
-  if (!name || !pin){ showErr($('g-err'),'Please type your name and PIN.'); return; }
+  if (!name || !pin){ showErr($('g-err'),'Please type your PIN.'); return; }
   $('g-btn').disabled = true; $('g-btn').textContent = 'Signing in…';
   try{
     const r = await call({action:'stuLogin', name, cls, pin});
     token = r.token; try{ sessionStorage.setItem('gj_stu_token', token); }catch(e){}
-    $('g-pin').value = '';
+    $('g-pin').value = ''; gateReset();
     await loadProfile();
   }catch(e){ showErr($('g-err'), e.message); }
-  $('g-btn').disabled = false; $('g-btn').textContent = 'Sign in';
+  $('g-btn').disabled = false; $('g-btn').textContent = gateStep === 1 ? 'Continue' : 'Sign in';
 }
 function logout(){ token=''; try{ sessionStorage.removeItem('gj_stu_token'); }catch(e){} if (preview){ window.close(); } show('gate'); }
 
@@ -490,6 +517,6 @@ function viewResult(id){
 
 init();
 </script>
-<div id="stu-ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;opacity:.55;pointer-events:none;color:var(--dim);">Student app v2026.10.25-b</div>
+<div id="stu-ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;opacity:.55;pointer-events:none;color:var(--dim);">Student app v2026.10.25-d</div>
 </body>
 </html>
