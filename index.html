@@ -126,6 +126,148 @@ async function call(body){
 function show(id){ ['boot','gate','app'].forEach(x => $(x).classList.toggle('hide', x !== id)); }
 function showErr(el, msg){ el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
 
+/* ===== GJ-STUDENT patch 1: follow the school's theme (paste into the student app's script) =====
+   Call stuApplySchoolTheme(info.theme) after stuPublic returns, and again after login. */
+/* ================================================================ GJ-LOOK: design themes (chosen by the admin, shown to everyone) */
+const GJ_FONTS = {
+  sans:  { stack:"'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", url:'Inter:wght@400;500;600;700' },
+  serif: { stack:"Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif", url:'' },
+  round: { stack:"'Nunito', ui-rounded, 'Trebuchet MS', system-ui, sans-serif", url:'Nunito:wght@400;600;700;800' },
+  jakarta: { stack:"'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif", url:'Plus+Jakarta+Sans:wght@400;500;600;700' },
+  poppins: { stack:"'Poppins', 'Segoe UI', system-ui, sans-serif", url:'Poppins:wght@400;500;600;700' }
+};
+function gjMk(id, name, desc, o){ return Object.assign({ id, name, desc, font:'sans', r:10, sh:'soft', side:'light', top:'solid', dark:false }, o); }
+const GJ_THEMES = [
+  { id:'classic', name:'Classic Paper', desc:'The original cream-and-navy look.', classic:true, top1:'#16233D', sideBg:'#F1EAD9', accent:'#B08D2B', paper:'#FAF6EC', panel:'#FFFFFF', side:'light', r:0 },
+  gjMk('greatjoy', 'Great Joy Blue & Gold', 'School blue with a gold accent. A confident default.', { top1:'#002E79', top2:'#0b4bb3', top:'grad', sideBg:'#002E79', side:'dark', accent:'#FBCF00', btn:'#002E79', paper:'#F3F6FB', panel:'#FFFFFF', line:'#DDE5F2', text:'#1B2A44', dim:'#5E6E8C', head:'#002E79', font:'jakarta' }),
+  gjMk('adminpro', 'Admin Pro', 'Dark sidebar, white cards, clean web-dashboard feel.', { top1:'#FFFFFF', top:'light', sideBg:'#1E293B', side:'dark', accent:'#3B82F6', btn:'#2563EB', paper:'#F1F5F9', panel:'#FFFFFF', line:'#E2E8F0', text:'#1E293B', dim:'#64748B', head:'#0F172A', r:8 }),
+  gjMk('ocean', 'Ocean Breeze', 'Deep sea blue fading into teal.', { top1:'#0B3954', top2:'#087E8B', top:'grad', sideBg:'#0B3954', side:'dark', accent:'#00B3B3', btn:'#087E8B', paper:'#EEF6F8', panel:'#FFFFFF', line:'#D6E6EA', text:'#16323F', dim:'#5B7885', head:'#0B3954', font:'jakarta' }),
+  gjMk('emerald', 'Emerald', 'Fresh and calm greens.', { top1:'#065F46', top:'solid', sideBg:'#064E3B', side:'dark', accent:'#34D399', btn:'#059669', paper:'#F0FDF4', panel:'#FFFFFF', line:'#D1EBDA', text:'#14342A', dim:'#5C7F70', head:'#065F46' }),
+  gjMk('sunset', 'Sunset', 'Warm orange to coral, light sidebar.', { top1:'#F97316', top2:'#EF4444', top:'grad', side:'light', sideBg:'#FFFFFF', accent:'#F97316', btn:'#EA580C', paper:'#FFF7ED', panel:'#FFFFFF', line:'#F6DFC8', text:'#3A2314', dim:'#8A6A52', head:'#9A3412', r:14, font:'poppins' }),
+  gjMk('royal', 'Royal Purple', 'Rich violet with a gradient header.', { top1:'#4C1D95', top2:'#7C3AED', top:'grad', sideBg:'#2E1065', side:'dark', accent:'#C084FC', btn:'#7C3AED', paper:'#FAF5FF', panel:'#FFFFFF', line:'#E7D9F7', text:'#2B1647', dim:'#7A6A92', head:'#4C1D95', font:'jakarta' }),
+  gjMk('rose', 'Rose', 'Soft pinks with a deep rose header.', { top1:'#BE123C', top:'solid', side:'light', sideBg:'#FFFFFF', accent:'#F43F5E', btn:'#E11D48', paper:'#FFF1F2', panel:'#FFFFFF', line:'#F7D5DA', text:'#3B1620', dim:'#8F6670', head:'#9F1239', r:14 }),
+  gjMk('crimson', 'Crimson Academic', 'Traditional school: burgundy, gold and serif type.', { top1:'#7F1D1D', top:'solid', sideBg:'#4A0E1C', side:'dark', accent:'#C9A227', btn:'#7F1D1D', paper:'#FBF7F2', panel:'#FFFFFF', line:'#E6D9C8', text:'#2E2118', dim:'#7A6A5A', head:'#7F1D1D', font:'serif', r:4, sh:'none' }),
+  gjMk('forest', 'Forest', 'Deep green sidebar, lime highlights.', { top1:'#FFFFFF', top:'light', sideBg:'#14352A', side:'dark', accent:'#84CC16', btn:'#3F6212', paper:'#F6F8F2', panel:'#FFFFFF', line:'#DEE5D2', text:'#1F2A1A', dim:'#667A5A', head:'#14352A' }),
+  gjMk('sky', 'Sky Minimal', 'Airy white and blue, very light.', { top1:'#FFFFFF', top:'light', sideBg:'#FFFFFF', side:'light', accent:'#0EA5E9', btn:'#0284C7', paper:'#F8FAFC', panel:'#FFFFFF', line:'#E5EAF0', text:'#0F172A', dim:'#64748B', head:'#0F172A', r:14, sh:'lift' }),
+  gjMk('mono', 'Monochrome', 'Black and white, sharp and serious.', { top1:'#111111', top:'solid', sideBg:'#FFFFFF', side:'light', accent:'#111111', btn:'#111111', paper:'#FAFAFA', panel:'#FFFFFF', line:'#E4E4E4', text:'#171717', dim:'#737373', head:'#111111', r:2, sh:'none' }),
+  gjMk('bubble', 'Bubblegum', 'Bright and playful, great for pre-school and primary.', { top1:'#EC4899', top2:'#F59E0B', top:'grad', sideBg:'linear-gradient(180deg,#8B5CF6,#EC4899)', side:'dark', accent:'#F59E0B', btn:'#DB2777', paper:'#FFF0F7', panel:'#FFFFFF', line:'#F8D3E6', text:'#3B1330', dim:'#94607F', head:'#BE185D', font:'round', r:20 }),
+  gjMk('midnight', 'Midnight (dark)', 'Easy on the eyes at night.', { dark:true, top1:'#0F172A', top:'solid', sideBg:'#0F172A', side:'dark', accent:'#38BDF8', btn:'#2563EB', paper:'#0B1220', panel:'#131C2E', line:'#26324A', text:'#CBD5E1', dim:'#94A3B8', head:'#E2E8F0' }),
+  gjMk('charcoal', 'Charcoal & Gold (dark)', 'Premium dark with gold accents.', { dark:true, top1:'#171717', top:'solid', sideBg:'#171717', side:'dark', accent:'#D4A64A', btn:'#D4A64A', btnText:'#141414', paper:'#101010', panel:'#1B1B1B', line:'#2E2E2E', text:'#D4D4D4', dim:'#8F8F8F', head:'#F5F5F5', font:'jakarta' })
+];
+function gjTheme(id){ return GJ_THEMES.find(t => t.id === id) || GJ_THEMES[0]; }
+function gjShade(hex, amt){ const m = /^#([0-9a-f]{6})$/i.exec(hex); if (!m) return hex; const n = parseInt(m[1], 16); const f = c => Math.max(0, Math.min(255, Math.round(c + amt))); return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(c => f(c).toString(16).padStart(2, '0')).join(''); }
+function gjTint(hex, a){ const m = /^#([0-9a-f]{6})$/i.exec(hex); if (!m) return 'rgba(0,0,0,.06)'; const n = parseInt(m[1], 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+function gjThemeCss(t){
+  if (t.classic) return '';
+  const f = GJ_FONTS[t.font] || GJ_FONTS.sans, sh = { none:'none', soft:'0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.06)', lift:'0 2px 4px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.10)' }[t.sh];
+  const top = t.top === 'grad' ? 'linear-gradient(90deg,' + t.top1 + ',' + (t.top2 || gjShade(t.top1, 40)) + ')' : t.top1;
+  const topLight = t.top === 'light', topText = topLight ? t.head : '#fff';
+  const sideDark = t.side === 'dark', btnText = t.btnText || '#fff', ink2 = gjShade(t.btn, t.dark ? 25 : -25);
+  const sideBg = t.sideBg, navText = sideDark ? 'rgba(255,255,255,.78)' : t.text, navHover = sideDark ? 'rgba(255,255,255,.08)' : gjTint(t.accent, .08), navActive = sideDark ? 'rgba(255,255,255,.14)' : gjTint(t.accent, .14);
+  const vars = '--ink:' + t.head + ';--ink-2:' + ink2 + ';--paper:' + t.paper + ';--paper-2:' + (t.dark ? gjShade(t.panel, 10) : gjShade(t.paper, -6)) + ';--line:' + t.line + ';--gold:' + t.accent + ';--text:' + t.text + ';--text-dim:' + t.dim + ';--panel:' + t.panel + ';--r:' + t.r + 'px;--sh:' + sh + ';--serif:' + f.stack + ';--sans:' + f.stack + ';'
+    + (t.dark ? '--green:#4ADE80;--green-bg:rgba(74,222,128,.14);--red:#F87171;--red-bg:rgba(248,113,113,.14);' : '');
+  const classicScope = '--ink:#16233D;--ink-2:#233052;--paper:#FAF6EC;--paper-2:#F1EAD9;--line:#D8CFB8;--gold:#B08D2B;--text:#2A2620;--text-dim:#6B6255;--panel:#fff;--green:#2F6B4F;--green-bg:#E4EFE7;--red:#A83232;--red-bg:#F6E4E1;--r:0px;--sh:none;';
+  const rr = 'calc(var(--r) * .6)';
+  let c = '@media screen{\n:root{' + vars + '}\n'
+    + 'body{font-family:var(--sans);background:var(--paper);color:var(--text);-webkit-font-smoothing:antialiased;}\n'
+    + '.rp-body,.rp-body *{--x:0;}.rp-body{' + classicScope + 'color:#2A2620;}\n'
+    // surfaces
+    + '.panel,.stat-card,.gate-card,.modal,.tt-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);}\n'
+    + '.gate-card::before{display:none;}.gate-card{padding:38px 34px 30px;}\n'
+    + '.gate{background:' + (t.side === 'dark' && /gradient/.test(sideBg) ? sideBg : 'linear-gradient(135deg,' + (t.top === 'light' ? t.sideBg : t.top1) + ',' + (t.top2 || gjShade(t.top1 === '#FFFFFF' ? t.accent : t.top1, -35)) + ')') + ';}\n'
+    + '.stat-card{border-top:1px solid var(--line);position:relative;overflow:hidden;}.stat-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold);}.stat-card.warn::before{background:var(--red);}.stat-card.good::before{background:var(--green);}\n'
+    + '.stat-card.warn,.stat-card.good{border-top-color:var(--line);}\n'
+    + '.panel h3,.modal h3,.empty-state .big{font-family:var(--sans);font-weight:700;letter-spacing:-.01em;color:var(--ink);}\n'
+    + '.view-title{font-family:var(--sans);font-weight:800;letter-spacing:-.02em;font-size:26px;color:var(--ink);}\n'
+    + '.gate-title{font-family:var(--sans);font-weight:800;letter-spacing:-.02em;color:var(--ink);}.gate-eyebrow{color:var(--gold);}\n'
+    // top bar
+    + '.topbar{background:' + top + ';color:' + topText + ';height:58px;box-shadow:' + (topLight ? '0 1px 0 var(--line)' : '0 2px 10px rgba(0,0,0,.12)') + ';}\n'
+    + '.topbar .school-name{font-family:var(--sans);font-weight:700;letter-spacing:-.01em;color:' + topText + ';}\n'
+    + '.role-pill{background:' + (topLight ? gjTint(t.accent, .14) : 'rgba(255,255,255,.18)') + ';color:' + topText + ';border-radius:99px;padding:5px 12px;}\n'
+    + '.logout-btn,.menu-btn{color:' + topText + ';border-color:' + (topLight ? 'var(--line)' : 'rgba(255,255,255,.4)') + ';border-radius:' + rr + ';}\n'
+    + '.logout-btn:hover{background:' + (topLight ? gjTint(t.accent, .1) : 'rgba(255,255,255,.16)') + ';}\n'
+    + '.sync-pill{color:' + topText + ';border-color:' + (topLight ? 'var(--line)' : 'rgba(255,255,255,.4)') + ';}\n'
+    // sidebar
+    + '.sidebar{background:' + sideBg + ';border-right:' + (sideDark ? 'none' : '1px solid var(--line)') + ';padding:14px 0;width:210px;}\n'
+    + '.nav-item{color:' + navText + ';margin:2px 10px;width:calc(100% - 20px);padding:10px 14px;border-left:none;border-radius:' + rr + ';font-weight:500;transition:background .15s,color .15s;}\n'
+    + '.nav-item:hover{background:' + navHover + ';}\n'
+    + '.nav-item.active{background:' + navActive + ';color:' + (sideDark ? '#fff' : t.head) + ';font-weight:700;box-shadow:inset 3px 0 0 var(--gold);}\n'
+    + '.nav-divider{background:' + (sideDark ? 'rgba(255,255,255,.12)' : 'var(--line)') + ';}\n'
+    // buttons and fields
+    + '.btn{border-radius:' + rr + ';border:1px solid ' + (t.dark ? 'var(--line)' : t.btn) + ';background:var(--panel);color:' + (t.dark ? 'var(--text)' : t.btn) + ';transition:all .15s;}\n'
+    + '.btn:hover{background:' + t.btn + ';color:' + btnText + ';border-color:' + t.btn + ';}\n'
+    + '.btn-solid,.btn-primary,.role-btn.active{background:' + t.btn + ';color:' + btnText + ';border-color:' + t.btn + ';border-radius:' + rr + ';}\n'
+    + '.btn-solid:hover,.btn-primary:hover{background:' + ink2 + ';color:' + btnText + ';border-color:' + ink2 + ';filter:none;}\n'
+    + '.ac-tab.active,.tt-tab.active,.tab.active,.sub-tab.active{background:' + t.btn + ';color:' + btnText + ';border-color:' + t.btn + ';}\n'
+    + '.ac-tab,.tt-tab{background:var(--panel);border-radius:' + rr + ';}\n'
+    + '.btn-primary{border-radius:' + rr + ';}.btn:disabled{opacity:.5;}\n'
+    + '.btn-gold{background:var(--gold);border-color:var(--gold);color:' + (t.dark ? '#111' : '#fff') + ';}.btn-gold:hover{background:var(--gold);filter:brightness(.92);}\n'
+    + '.btn-danger{background:var(--panel);border-color:var(--red);color:var(--red);}.btn-danger:hover{background:var(--red);color:#fff;}\n'
+    + '.role-btn{border-radius:' + rr + ';background:var(--panel);color:var(--text-dim);border-color:var(--line);}\n'
+    + '.field label{color:var(--text);font-weight:600;}\n'
+    + 'input,select,textarea{color:var(--text);}\n'
+    + '.field input,.field select,.field textarea,.toolbar input[type=text],.toolbar select,.panel input[type=text],.panel input[type=number],.panel input[type=date],.panel input[type=email],.panel input[type=password],.panel input[type=time],.panel select,.panel textarea,.modal input,.modal select,.modal textarea{background:' + (t.dark ? gjShade(t.panel, 12) : t.panel) + ';border:1px solid var(--line);border-radius:' + rr + ';color:var(--text);}\n'
+    + '.field input:focus,.field select:focus,.panel input:focus,.panel select:focus,.panel textarea:focus{outline:2px solid ' + gjTint(t.accent, .55) + ';outline-offset:0;border-color:var(--gold);}\n'
+    // tables
+    + 'thead th{border-bottom:1px solid var(--line);background:' + (t.dark ? gjShade(t.panel, 8) : gjShade(t.paper, -3)) + ';color:var(--text-dim);text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;}\n'
+    + 'tbody td{border-bottom:1px solid var(--line);}\ntbody tr:hover{background:' + gjTint(t.accent, .07) + ';}\n'
+    + '.status-badge{border-radius:99px;padding:3px 10px;}.status-over{background:' + (t.dark ? 'rgba(251,191,36,.15)' : '#FFF3D6') + ';color:' + (t.dark ? '#FBBF24' : '#9A6B00') + ';}\n'
+    // popups
+    + '.modal-overlay{background:rgba(10,15,30,.55);backdrop-filter:blur(3px);}.modal{max-width:460px;}\n'
+    + '.rp-box{border-radius:var(--r);overflow:hidden;}.rp-bar{background:' + top + ';color:' + topText + ';}.rp-bar .btn{border-radius:' + rr + ';}\n'
+    + '.toast{border-radius:99px;}\n'
+    + '.att-table th.att-n,.att-table td.att-n,.att-table th.att-s,.att-table td.att-s{background:var(--panel);}\n'
+    + '.hint{color:var(--text-dim);}\n'
+    + '::selection{background:var(--gold);color:' + (t.dark ? '#111' : '#fff') + ';}\n'
+    + '::-webkit-scrollbar{width:10px;height:10px;}::-webkit-scrollbar-thumb{background:' + (t.dark ? '#3a475f' : '#c9d2de') + ';border-radius:99px;border:2px solid transparent;background-clip:content-box;}\n';
+  if (t.dark){
+    c += '[style*="background:#fff"],[style*="background: #fff"],[style*="background:#FFF"],[style*="background:white"],[style*="background:#ffffff"]{background:var(--panel) !important;}\n'
+      + '[style*="background:#fafafa"],[style*="background:#f7f7f7"],[style*="background:#f4f4f4"],[style*="background:#f1f8f3"],[style*="background:#f1f5f9"],[style*="background:#FAF6EC"],[style*="background:#faf6ec"],[style*="background:#fffdf8"],[style*="background:#fffaf0"],[style*="background:#fff7e0"]{background:var(--paper-2) !important;}\n'
+      + '[style*="color:#000"],[style*="color:#111"],[style*="color:#222"],[style*="color:#333"]{color:var(--text) !important;}\n'
+      + '.rp-body [style*="background:#fff"]{background:#fff !important;}\n'
+      + 'img{color-scheme:light;}\n'
+      + '.btn-sm,.btn{color-scheme:dark;}\n';
+  }
+  c += '}\n@media (max-width:820px){.sidebar{width:auto;}}\n';
+  return c;
+}
+function gjLoadFont(font){
+  const f = GJ_FONTS[font]; if (!f || !f.url) return;
+  const id = 'gj-font-' + font; if (document.getElementById(id)) return;
+  try{ const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + f.url + '&display=swap'; document.head.appendChild(l); }catch(e){}
+}
+function applyTheme(id){
+  const t = gjTheme(id);
+  let el = document.getElementById('gj-theme');
+  if (!el){ el = document.createElement('style'); el.id = 'gj-theme'; document.head.appendChild(el); }
+  el.textContent = gjThemeCss(t);
+  document.documentElement.setAttribute('data-gj-theme', t.id);
+  gjLoadFont(t.font);
+  try{ localStorage.setItem('gj_theme', t.id); }catch(e){}
+  const mt = document.querySelector('meta[name="theme-color"]'); if (mt) mt.content = t.top1;
+}
+function stuApplySchoolTheme(id){
+  try{
+    applyTheme(id || localStorage.getItem('gj_theme') || 'classic');
+    const t = gjTheme(document.documentElement.getAttribute('data-gj-theme')), r = document.documentElement;
+    let el = document.getElementById('gj-stu-extra'); if (!el){ el = document.createElement('style'); el.id = 'gj-stu-extra'; document.head.appendChild(el); }
+    if (t.classic){ r.style.removeProperty('--dim'); el.textContent = ''; }
+    else { r.style.setProperty('--dim', t.dim); el.textContent = 'body{background:var(--paper);color:var(--text);}' + (t.dark ? 'input,select,textarea{background:var(--panel)!important;color:var(--text)!important;}.card,.panel{background:var(--panel);}' : ''); }
+  }catch(e){}
+}
+try{ if (localStorage.getItem('gj_theme')) stuApplySchoolTheme(localStorage.getItem('gj_theme')); }catch(e){}
+
+
+/* ===== writing box for essays, letters, reports, speeches, articles ===== */
+function stuWc(t){ return (String(t || '').match(/[A-Za-z0-9’'\-]+/g) || []).length; }
+function stuEssayBox(q, value){
+  const e = q.essay, lim = (e.minW ? 'at least ' + e.minW : '') + (e.minW && e.maxW ? ' and ' : '') + (e.maxW ? 'not more than ' + e.maxW : '');
+  const hint = { essay:'Write your essay with an introduction, body paragraphs and a conclusion.', letter:'Include your address, the date, a greeting (Dear ...), the body, and a closing (Yours faithfully / sincerely).', report:'Give a title, headings, your findings and a conclusion.', speech:'Begin by addressing your audience, and end with a clear closing.', article:'Give a headline, then write for your readers.' }[e.kind] || '';
+  return '<div style="font-size:13px;opacity:.8;margin:4px 0;">' + hint + (lim ? ' Length: ' + lim + ' words.' : '') + '</div>'
+    + '<textarea id="a-' + q.id + '" rows="14" style="line-height:1.5;" oninput="saveDraft();var c=document.getElementById(\'wc-' + q.id + '\');if(c)c.textContent=stuWc(this.value)+\' words\'" spellcheck="true" placeholder="Write here">' + esc(value) + '</textarea>'
+    + '<div id="wc-' + q.id + '" style="font-size:12px;opacity:.7;">' + stuWc(value) + ' words</div>';
+}
+
 async function init(){
   const m = /[#&]t=([^&]+)/.exec(location.hash);
   if (m){ token = decodeURIComponent(m[1]); preview = true; history.replaceState(null,'',location.pathname+location.search); }
@@ -133,6 +275,7 @@ async function init(){
   try{
     const info = await call({action:'stuPublic'});
     document.title = (info.schoolName || 'School') + ' — Student App';
+    stuApplySchoolTheme(info.theme);
     $('g-school').textContent = info.schoolName || 'Student App';
     $('g-motto').textContent = info.motto || '';
     if (info.logo){ $('g-logo').src = info.logo; $('g-logo').classList.remove('hide'); }
@@ -298,6 +441,7 @@ function qInput(q, v){
   v = v == null ? '' : v;
   if (q.type === 'mcq') return q.options.map((o, j) => '<label style="display:flex;gap:10px;align-items:flex-start;margin:8px 0;font-weight:400;font-size:15px;"><input type="radio" name="q-' + q.id + '" value="' + j + '" ' + (String(v) === String(j) ? 'checked' : '') + ' onchange="saveDraft()" style="width:auto;margin-top:3px;"><span><b>' + 'ABCDEFGH'[j] + '.</b> ' + gjRich(o) + '</span></label>').join('');
   if (q.type === 'short') return '<input id="a-' + q.id + '" value="' + esc(v) + '" oninput="saveDraft()" placeholder="Your answer" autocomplete="off">';
+  if (q.type === 'theory' && q.essay) return stuEssayBox(q, v);
   return '<textarea id="a-' + q.id + '" rows="6" oninput="saveDraft()" placeholder="Write your answer here">' + esc(v) + '</textarea>';
 }
 function leaveWork(){ saveDraft(); clearInterval(timerId); CUR = null; loadWork(); }
