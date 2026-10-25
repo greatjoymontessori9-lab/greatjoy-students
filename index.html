@@ -252,7 +252,17 @@ function stuApplySchoolTheme(id){
     const t = gjTheme(document.documentElement.getAttribute('data-gj-theme')), r = document.documentElement;
     let el = document.getElementById('gj-stu-extra'); if (!el){ el = document.createElement('style'); el.id = 'gj-stu-extra'; document.head.appendChild(el); }
     if (t.classic){ r.style.removeProperty('--dim'); el.textContent = ''; }
-    else { r.style.setProperty('--dim', t.dim); el.textContent = 'body{background:var(--paper);color:var(--text);}' + (t.dark ? 'input,select,textarea{background:var(--panel)!important;color:var(--text)!important;}.card,.panel{background:var(--panel);}' : ''); }
+    else {
+      r.style.setProperty('--dim', t.dim);
+      const topBg = t.top === 'grad' ? 'linear-gradient(90deg,' + t.top1 + ',' + (t.top2 || gjShade(t.top1, 40)) + ')' : t.top1, light = t.top === 'light', topTx = light ? t.head : '#fff', btn = t.btn || t.top1, btnTx = t.btnText || '#fff';
+      const gateBg = (t.side === 'dark' && /gradient/.test(t.sideBg)) ? t.sideBg : 'linear-gradient(135deg,' + (light ? t.sideBg : t.top1) + ',' + (t.top2 || gjShade(t.top1 === '#FFFFFF' ? t.accent : t.top1, -35)) + ')';
+      el.textContent = 'body{background:var(--paper);color:var(--text);}'
+        + '.gate{background:' + gateBg + ';}.card,.box,.tabs{background:var(--panel);}.card{border-radius:var(--r);box-shadow:var(--sh);}.box{border-radius:var(--r);}'
+        + '.top{background:' + topBg + ';color:' + topTx + ';' + (light ? 'border-bottom:1px solid var(--line);' : '') + '}.top button{color:' + topTx + ';border-color:' + (light ? 'var(--line)' : 'rgba(255,255,255,.5)') + ';border-radius:calc(var(--r)*.6);}'
+        + '.btn{background:' + btn + ';color:' + btnTx + ';border-radius:calc(var(--r)*.6);}.btn.ghost{background:transparent;color:' + (t.dark ? t.accent : btn) + ';border-color:' + (t.dark ? t.accent : btn) + ';}'
+        + 'input,select,textarea{border-radius:calc(var(--r)*.6);' + (t.dark ? 'background:var(--panel);color:var(--text);' : '') + '}'
+        + (t.dark ? '.p-pending{background:rgba(251,191,36,.16);color:#FCD34D;}' : '');
+    }
   }catch(e){}
 }
 try{ if (localStorage.getItem('gj_theme')) stuApplySchoolTheme(localStorage.getItem('gj_theme')); }catch(e){}
